@@ -8,3 +8,4 @@ redis
 celery
 passlib
 bcrypt
+alembic
