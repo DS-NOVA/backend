@@ -2,6 +2,9 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+email-validator
 python-dotenv
 redis
 celery
+passlib
+bcrypt
