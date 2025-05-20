@@ -25,3 +25,15 @@ class UserResponse(BaseModel):
 
     class Config:
         orm_model = True
+
+#토큰
+class Token(BaseModel):
+    access_token : str
+    token_type: str
+
+#로그인 응답 스키마
+class LoginResponse(BaseModel):
+    message: str
+    status_code: int
+    token:str
+    user: UserResponse
