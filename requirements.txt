@@ -9,3 +9,4 @@ celery
 passlib
 bcrypt
 alembic
+python-multipart

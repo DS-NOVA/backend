@@ -2,17 +2,14 @@ from sqlalchemy.orm import Session
 
 from app.models.user import User
 from app.schemas.user import UserCreate
-
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.security import get_password_hash
 
 #유저 생성 (회원가입)
 #schema의 내용을 model에 input
 def create_user(db:Session, new_user:UserCreate):
     user = User(
         user_email = new_user.user_email,
-        user_password = pwd_context.hash(new_user.user_password) #비밀번호 해싱
+        user_password = get_password_hash(new_user.user_password) #비밀번호 해싱
     )
     db.add(user)
     db.commit()
