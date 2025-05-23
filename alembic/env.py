@@ -23,7 +23,9 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 from app.db.database import Base
-from app.models.user import User # 필요한 모델들을 모두 import
+from app.models.user import User
+from app.models.video import Video
+from app.models.history import History
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
