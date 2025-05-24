@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from database.mysql import Base
+from app.db.database import Base
 from datetime import datetime
 
 class History(Base):
@@ -10,3 +10,6 @@ class History(Base):
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     video_id = Column(Integer, ForeignKey("video.id"), nullable=False)
     viewed_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="histories")
+    video = relationship("Video", back_populates="histories")

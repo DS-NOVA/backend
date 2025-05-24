@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 from app.db.database import SessionLocal
 from sqlalchemy import text
-
+from app.routers import user_router
 
 app = FastAPI()
+
+app.include_router(user_router.router)
 
 @app.get("/")
 def root():
