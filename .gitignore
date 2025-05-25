@@ -24,3 +24,6 @@ celerybeat-schedule
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+#database
+init_db.py
