@@ -1,7 +1,9 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import SessionLocal
 from sqlalchemy import text
 from app.routers import user_router
+from app.routers import upload_router
 
 app = FastAPI()
 
