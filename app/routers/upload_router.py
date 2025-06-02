@@ -16,3 +16,4 @@ async def upload_video(video: UploadFile = File(...)):
         return {"message": f"File '{video.filename}' uploaded successfully!"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 업로드 실패: {str(e)}")
+

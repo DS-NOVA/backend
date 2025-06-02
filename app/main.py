@@ -8,6 +8,7 @@ from app.routers import upload_router
 app = FastAPI()
 
 app.include_router(user_router.router)
+app.include_router(upload_router.router)
 
 @app.get("/")
 def root():
