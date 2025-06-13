@@ -10,6 +10,15 @@ app = FastAPI()
 app.include_router(user_router.router)
 app.include_router(upload_router.router)
 
+#cors 코드 추가 (추후 수정)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 def root():
     return {"message": "nova backend"}
