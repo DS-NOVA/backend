@@ -4,11 +4,20 @@ from app.db.database import SessionLocal
 from sqlalchemy import text
 from app.routers import user_router
 from app.routers import upload_router
+from app.routers import feedback_router
 
 app = FastAPI()
 
 app.include_router(user_router.router)
 app.include_router(upload_router.router)
+app.include_router(feedback_router.router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 또는 특정 도메인
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
