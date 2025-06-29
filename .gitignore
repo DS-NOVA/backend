@@ -27,3 +27,6 @@ Desktop.ini
 
 #database
 init_db.py
+
+#interpole
+uploads/*
