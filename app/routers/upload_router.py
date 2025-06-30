@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
 from app.cruds.interpolation import conversion, get_frame_indices, extract_frame_ranges
-from app.routers.test import clip_position_data
+from app.cruds.clip_position import clip_position_data
 
 router = APIRouter(prefix="/nova/dashboard/video/upload") 
 
