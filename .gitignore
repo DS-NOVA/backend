@@ -29,4 +29,7 @@ Desktop.ini
 init_db.py
 
 #interpole
-uploads/*
+uploads/
+
+#profiles
+static/
