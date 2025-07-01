@@ -4,12 +4,14 @@ from app.db.database import SessionLocal
 from sqlalchemy import text
 from app.routers import user_router
 from app.routers import upload_router
+from app.routers.save_router import router as save_router
 from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
 app.include_router(user_router.router)
 app.include_router(upload_router.router)
+app.include_router(save_router)
 app.mount("/static", StaticFiles(directory="uploads"), name="static") #검출 모델
 
 #cors 코드 추가 (추후 수정)
