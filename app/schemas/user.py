@@ -3,6 +3,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 #user 생성 스키마 (회원가입 시 사용)
 class UserCreate(BaseModel):
     id: int
+    user_name: str
     user_email: EmailStr
     user_password: str = Field(min_length=6)
 
