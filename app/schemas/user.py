@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 #user 생성 스키마 (회원가입 시 사용)
 class UserCreate(BaseModel):
-    id: int
+    #id: int
     user_name: str
     user_email: EmailStr
     user_password: str = Field(min_length=6)
@@ -25,7 +25,7 @@ class UserResponse(BaseModel):
     user_email: EmailStr
 
     class Config:
-        orm_model = True
+        from_attributes = True
 
 #토큰
 class Token(BaseModel):
@@ -36,5 +36,5 @@ class Token(BaseModel):
 class LoginResponse(BaseModel):
     message: str
     status_code: int
-    token:str
+    access_token:str
     user: UserResponse
