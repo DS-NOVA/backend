@@ -62,7 +62,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db:Session = Depends
     return {
         "message": "로그인 성공",
         "status_code": 200,
-        "token": access_token,
+        "access_token": access_token,
         "user": user
     }
 
