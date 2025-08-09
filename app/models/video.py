@@ -13,4 +13,4 @@ class Video(Base):
 
     user = relationship("User", back_populates="videos")
     histories = relationship("History", back_populates="video")
-    details = relationship("VideoDetails", back_populates="video")
+    video_details = relationship("VideoDetails", back_populates="video")
