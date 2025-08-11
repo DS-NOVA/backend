@@ -13,3 +13,4 @@ class User(Base):
 
     videos = relationship("Video", back_populates="user")
     histories = relationship("History", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")

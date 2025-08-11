@@ -1,45 +1,39 @@
 import os
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header
+import secrets
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserResponse, LoginResponse
 from app.cruds.user_crud import create_user, get_user_by_email, get_all_users
 from app.db.database import SessionLocal, get_db
-from app.security import verify_password
+from app.security.security import verify_password
+from app.security.auth import create_access_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
-from jose import jwt
+from datetime import timedelta
+from app.cruds.refresh_crud import *
+
+
 
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = float(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
 router = APIRouter(prefix="/nova/auth")
 
-
+#회원가입
 @router.post("/signup", response_model=UserResponse)
 def signup(new_user:UserCreate, db:Session = Depends(get_db)):
-    #기존에 존재하는 회원인지 확인
+    #기존에 존재하는 회원인지 확인 (이메일로)
     db_user = get_user_by_email(db, new_user.user_email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registerd")
     #없는 경우 회원가입 진행
     return create_user(db, new_user)
 
-
+#로그인
 @router.post("/login", response_model=LoginResponse)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db:Session = Depends(get_db), response: Response = None):
+def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db:Session = Depends(get_db)):
     #유저가 있는지 확인해야 함
     user = get_user_by_email(db, form_data.username)#form data는 username으로 사용하므로 email 있어도 상관없음
 
@@ -48,16 +42,23 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db:Session = Depends
     #잘못된 비밀번호 입력시
     if not verify_password(form_data.password, user.user_password):
         raise HTTPException(status_code=401, detail="비밀번호가 잘못 입력되었습니다.")
-    
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.user_email}, expires_delta = access_token_expires)
+    access_token = create_access_token(data={"sub": str(user.id)}, expires_delta = access_token_expires)
 
     # 쿠키에 저장
     # secure 은 배포 시에는 반드시 True (https 환경에서만 전송)
     # samesite 는 cors 환경에 따라 조절
-    # 프론트에서 axios.post('/login', data, { withCredentials: true }) 설정해야 함
-    # 프론트에서 연동 후 response 에서 token 제거
-    response.set_cookie(key="access_token", value=access_token, expires=access_token_expires, httponly=True, secure=False, samesite="lax")
+    # secure=True, samesite="none"
+    refresh_token = create_refresh_token(db, user.id)
+    csrf_token = secrets.token_urlsafe(16)
+
+    response.set_cookie(
+        "refresh_token", refresh_token, httponly=True, secure=False, samesite="lax", max_age=14*24*3600, path="/nova/auth"
+    )
+    response.set_cookie(
+        "csrf_token", csrf_token, httponly=False, secure=False, samesite="lax", max_age=14*24*3600, path="/nova/auth"
+    )
 
     return {
         "message": "로그인 성공",
@@ -66,7 +67,66 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db:Session = Depends
         "user": user
     }
 
-#모든 유저 조회
+#모든 유저 조회 (추후 삭제)
 @router.get("/", response_model=list[UserResponse])
 def read_all_users(db:Session = Depends(get_db)):
     return get_all_users(db)
+
+
+#refresh 토큰, csrf 쿠키 읽기
+@router.post("/refresh")
+def refresh(request: Request, response: Response, x_csrf_token: str = Header(..., alias="X-CSRF-Token"), db: Session = Depends(get_db)):
+    refresh_token = request.cookies.get("refresh_token")
+    csrf_cookie = request.cookies.get("csrf_token")
+    #csrf_header = request.headers.get("x-csrf-token")
+
+    if not refresh_token or not csrf_cookie or csrf_cookie != x_csrf_token:
+        raise HTTPException(status_code=403, detail="CSRF check failed")
+
+    rec = get_refresh_token_from_db(db, refresh_token)
+    if not rec:
+        # 서버 저장소에 없는 토큰 → revoke 취급
+        raise HTTPException(status_code=401, detail={"error": "token_revoked"})
+
+    user_id = verify_refresh_token(db, refresh_token)  # int user_id 반환(만료/취소 검사 포함)
+
+    # Access 재발급
+    new_access = create_access_token({"sub": str(user_id)},expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+
+    # Refresh 로테이션
+    new_refresh = rotate_refresh_token(db, refresh_token, user_id)
+    response.set_cookie("refresh_token", new_refresh, httponly=True, secure=False, samesite="lax", max_age=14 * 24 * 3600, path="/nova/auth")
+
+    return {"access_token": new_access, "token_type": "bearer"}
+
+#로그아웃
+@router.post("/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    rt = request.cookies.get("refresh_token")
+
+    if rt:
+        try:
+            user_id = verify_refresh_token(db, rt)  # 실패 시 예외 → 무시하고 쿠키만 지워도 됨
+            delete_refresh_token_for_user(db, user_id)
+        except HTTPException:
+            pass
+
+    # 쿠키 삭제 (항상)
+    response.delete_cookie("refresh_token", path="/nova/auth")
+    response.delete_cookie("csrf_token", path="/nova/auth")
+    return {"message": "logged out"}
+
+
+#테스트용 라우터 
+@router.get("/me")
+def me(user = Depends(get_current_user)):
+    # 필요한 최소 정보만 반환 (스키마 맞추고 싶으면 UserResponse 사용해도 됨)
+    return {
+        "ok": True,
+        "user": {
+            "id": user.id,
+            "user_name": user.user_name,
+            "user_email": user.user_email,
+        }
+    }
+
