@@ -14,6 +14,8 @@ app = FastAPI()
 origins = [
     "http://127.0.0.1:5501",
     "http://localhost:5501",
+    "http://127.0.0.1:8000", 
+    "http://localhost:8000"
 ]
 
 app.include_router(user_router.router)
@@ -25,7 +27,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static") #검출 �
 #cors 코드 추가 (추후 수정)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

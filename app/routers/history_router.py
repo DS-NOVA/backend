@@ -4,7 +4,7 @@ from app.db.database import SessionLocal, get_db
 from app.schemas.history import HistoryResponse
 from app.schemas.history import HistoryListResponse, HistoryDeleteResponse
 from app.models.history import History as history
-from app.security import get_current_user
+from app.security.auth import get_current_user
 from app.cruds.history_crud import get_history_by_video, delete_history_by_video
 from app.models.video import Video
 from datetime import datetime
