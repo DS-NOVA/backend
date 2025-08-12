@@ -1,52 +1,60 @@
-from fastapi import APIRouter, HTTPException, Header
-from app.schemas.feedback import FeedbackRequest, FeedbackResponse
-import smtplib
-# from email.message import EmailMessage
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.header import Header as EmailHeader
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter()
+
+class Feedback(BaseModel):
+    user_id: str
+    feedback_type: str
+    video_title: str
+    content: str
+
 import os
-# from app.db.database import get_db
+from fastapi import APIRouter
+from pydantic import BaseModel
+from email.message import EmailMessage
+import smtplib
+from dotenv import load_dotenv
 
-router = APIRouter(
-    prefix="/nova/auth",
-    tags=["Feedback"]
-)
+# .env 파일 로딩
+load_dotenv()
 
-@router.post("/feedback", response_model=FeedbackResponse)
-async def send_feedback(
-    feedback: FeedbackRequest,
-    authorization: str = Header(..., alias="Authorization")
-):
-    sender_email = os.getenv("EMAIL_USER")
-    receiver_email = os.getenv("EMAIL_USER")
-    app_password = os.getenv("EMAIL_APP_PASSWORD")
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 
-    email_content = f"""[Feedback Notification]
-    User ID: {feedback.user_id}
-    Video Title: {feedback.video_title}
-    Feedback Type: {feedback.feedback_type}
-    Content: {feedback.content}
-    """
+router = APIRouter()
 
-    msg = MIMEMultipart()
+class Feedback(BaseModel):
+    user_id: str
+    feedback_type: str
+    video_title: str
+    content: str
 
-    subject = EmailHeader("새로운 피드백이 도착했습니다.", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    
-    msg.set_charset("utf-8")
-    
-    # 본문을 UTF-8로 인코딩
-    body = MIMEText(email_content, "plain", "utf-8")
-    msg.attach(body)
+@router.post("/nova/auth/feedback")
+def receive_feedback(feedback: Feedback):
+    print(f"Feedback received: {feedback}")
 
+    msg = EmailMessage()
+    msg["Subject"] = f"[Nova 피드백] {feedback.video_title}"
+    msg["From"] = EMAIL_USER  
+    msg["To"] = "merryc1105@gmail.com"  
+    msg["Reply-To"] = feedback.user_id  
+
+    msg.set_content(f"""
+[피드백 도착]
+
+- 사용자 ID: {feedback.user_id}
+- 유형: {feedback.feedback_type}
+- 영상 제목: {feedback.video_title}
+- 내용:
+{feedback.content}
+""")
 
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-            smtp.login(sender_email, app_password)
+            smtp.login(EMAIL_USER, EMAIL_APP_PASSWORD)
             smtp.send_message(msg)
-        return FeedbackResponse(message="피드백이 성공적으로 제출되었습니다.")
+        return {"message": "피드백이 성공적으로 제출되었습니다."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"이메일 전송 실패: {str(e)}")
+        print("메일 전송 실패:", e)
+        return {"message": "피드백 제출에 실패했습니다."}

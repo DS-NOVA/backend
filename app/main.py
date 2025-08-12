@@ -2,19 +2,31 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import SessionLocal
 from sqlalchemy import text
+from app.db.database import SessionLocal, Base, engine, init_models 
 from app.routers import user_router
 from app.routers import upload_router
+from fastapi.staticfiles import StaticFiles
+from app.routers import history_router 
 from app.routers import feedback_router
 
 app = FastAPI()
 
+origins = [
+    "http://127.0.0.1:5501",
+    "http://localhost:5501",
+]
+
 app.include_router(user_router.router)
 app.include_router(upload_router.router)
+app.include_router(history_router.router)
 app.include_router(feedback_router.router)
+app.mount("/static", StaticFiles(directory="uploads"), name="static") #검출 모델
 
+#cors 코드 추가 (추후 수정)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 또는 특정 도메인
+    allow_origins=["*"], 
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserResponse, LoginResponse
 from app.cruds.user_crud import create_user, get_user_by_email, get_all_users
-from app.db.database import SessionLocal
+from app.db.database import SessionLocal, get_db
 from app.security import verify_password
 from fastapi.security import OAuth2PasswordRequestForm
 from dotenv import load_dotenv
@@ -27,12 +27,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 router = APIRouter(prefix="/nova/auth")
 
-def get_db():
-    db = SessionLocal()
-    try: 
-        yield db 
-    finally: 
-        db.close()
 
 @router.post("/signup", response_model=UserResponse)
 def signup(new_user:UserCreate, db:Session = Depends(get_db)):

@@ -6,8 +6,8 @@ email-validator
 python-dotenv
 redis
 celery
-passlib
-bcrypt
+passlib[bcrypt]
 alembic
 python-multipart
 python-jose
+pymysql
