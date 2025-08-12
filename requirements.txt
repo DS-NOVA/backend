@@ -11,3 +11,4 @@ alembic
 python-multipart
 python-jose
 pymysql
+aiofiles
