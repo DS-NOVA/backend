@@ -22,7 +22,7 @@ app.include_router(user_router.router)
 app.include_router(upload_router.router)
 app.include_router(history_router.router)
 app.include_router(feedback_router.router)
-app.mount("/static", StaticFiles(directory="uploads"), name="static") #검출 모델
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 #cors 코드 추가 (추후 수정)
 app.add_middleware(

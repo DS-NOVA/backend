@@ -7,10 +7,10 @@ DEFAULT_USER_IMAGE = "/static/profiles/default.png"
 
 #유저 생성 (회원가입)
 #schema의 내용을 model에 input
-def create_user(db:Session, new_user:UserCreate):
+def create_user(db:Session, new_user:UserCreate, image_url: str | None = None):
     user = User(
         user_name = new_user.user_name,
-        user_image = DEFAULT_USER_IMAGE, #기본 프로필 이미지 (추후 수정)
+        user_image = image_url or DEFAULT_USER_IMAGE, #기본 프로필 이미지 (추후 수정)
         user_email = new_user.user_email,
         user_password = get_password_hash(new_user.user_password) #비밀번호 해싱
     )
