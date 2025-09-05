@@ -33,3 +33,8 @@ uploads/
 
 #profiles
 static/
+
+#lightgbm
+data/
+models/
+
