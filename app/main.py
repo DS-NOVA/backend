@@ -9,13 +9,18 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import history_router 
 from app.routers import feedback_router
 
+from app.routers import pipeline_predict
+#from app.db.mongo import init_mongo
+
 app = FastAPI()
 
 origins = [
     "http://127.0.0.1:5501",
     "http://localhost:5501",
     "http://127.0.0.1:8000", 
-    "http://localhost:8000"
+    "http://localhost:8000",
+    "http://localhost:5502",
+    "http://127.0.0.1:5502"
 ]
 
 app.include_router(user_router.router)
@@ -23,6 +28,9 @@ app.include_router(upload_router.router)
 app.include_router(history_router.router)
 app.include_router(feedback_router.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.include_router(pipeline_predict.router)
+
 
 #cors 코드 추가 (추후 수정)
 app.add_middleware(
@@ -50,3 +58,8 @@ def db():
     
     finally:
         db.close()
+
+
+"""@app.on_event("startup")
+def startup_event():
+    init_mongo()"""
