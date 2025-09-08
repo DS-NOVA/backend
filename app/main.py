@@ -10,7 +10,7 @@ from app.routers import history_router
 from app.routers import feedback_router
 
 from app.routers import pipeline_predict
-#from app.db.mongo import init_mongo
+from app.db.mongo import init_mongo
 
 app = FastAPI()
 
@@ -60,6 +60,9 @@ def db():
         db.close()
 
 
-"""@app.on_event("startup")
+#MongoDB 연결 준비
+@app.on_event("startup")
 def startup_event():
-    init_mongo()"""
+    init_mongo()
+
+#추후 shutdown 추가
