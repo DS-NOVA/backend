@@ -15,7 +15,7 @@ import time
 from app.cruds.interp_crud import (
 assemble_interpolated_video, merge_ones_with_gap, RampVSParams
 )
-#검출 모델은 수정하지 않는 조건이므로, 그대로 import
+# ✅ 검출 모델은 수정하지 않는 조건이므로, 그대로 import
 from app.routers.pipeline_predict import predict_pipeline
 from app.cruds.metrics_crud import run_cv_metrics, dump_json
 from datetime import datetime

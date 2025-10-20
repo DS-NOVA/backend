@@ -1,5 +1,3 @@
-# app/cruds/interp_crud.py
-
 # [KEEP] 기존 import들...
 import time
 import torch
