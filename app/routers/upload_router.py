@@ -15,7 +15,8 @@ assemble_interpolated_video, merge_ones_with_gap, RampVSParams
 from app.routers.pipeline_predict import predict_pipeline
 from app.cruds.metrics_crud import run_cv_metrics, dump_json
 from app.utils.pdf_report import export_frame_labels_pdf
-
+from app.utils.frame_labels import CV_TEXT_MAP, PRED_TEXT_MAP
+from app.utils.json_report import export_frame_labels_json
 
 router = APIRouter(prefix="/nova/dashboard/video/upload")
 
@@ -415,77 +416,11 @@ def cv_union_vector_by_label(cv_flags: dict[str, list[int]], label_order: list[s
         out.append(1 if any(int(x) != 0 for x in arr) else 0)
     return out
 
-# frame_labels.json, pdf 요약 생성성    
-def save_local_frame_labels(
-    video_dir: Path,
-    graph_points: list[dict],
-    cv_label_order: list[str],
-    make_pdf: bool = True
-) -> tuple[Path, Path | None]:
-    """
-    graph_points: _make_graph_points_per_frame() 결과(프레임별 start/end + n차원 labels)
-    - 모든 라벨이 0인 프레임은 제외해서 저장
-    - frame_labels.json과 (옵션) frame_labels.pdf 생성
-    return: (json_path, pdf_path_or_None)
-    """
-    names = list(cv_label_order) + ["flash", "pattern", "redlight"]
-
-    CV_TEXT_MAP = {
-        "phf": "잠재적으로 해로운 섬광이 있습니다.",
-        "phr": "잠재적으로 해로운 적색 섬광이 있습니다.",
-        "pfs": "잠재적으로 해로운 섬광이 깜빡거립니다.",
-        "ps" : "잠재적으로 해로운 깜빡임이 지속됩니다.",
-        "php": "잠재적으로 해로운 패턴이 있습니다.",
-        "psp": "잠재적으로 해로운 패턴이 일정 면적을 차지합니다.",
-    }
-    PRED_TEXT_MAP = {
-        "flash":    "해로운 섬광이 검출되었습니다.",
-        "pattern":  "해로운 패턴이 검출되었습니다.",
-        "redlight": "해로운 적색 섬광이 검출되었습니다.",
-    }
-
-    out_records = []
-    for gp in graph_points:
-        vec = [int(x) for x in (gp.get("labels") or [])]
-        if not vec or sum(vec) == 0:
-            continue
-
-        label_kv = {name: (vec[i] if i < len(vec) else 0) for i, name in enumerate(names)}
-
-        cv_texts = []
-        for nm in cv_label_order:
-            idx = names.index(nm)
-            if idx < len(vec) and vec[idx] == 1 and nm in CV_TEXT_MAP:
-                cv_texts.append(CV_TEXT_MAP[nm])
-
-        pred_texts = []
-        for nm in ["flash", "pattern", "redlight"]:
-            idx = names.index(nm)
-            if idx < len(vec) and vec[idx] == 1 and nm in PRED_TEXT_MAP:
-                pred_texts.append(PRED_TEXT_MAP[nm])
-
-        out_records.append({
-            "frame": gp["frame"],
-            "start": gp["start"],
-            "end": gp["end"],
-            "labels": label_kv,                 # {"phf":1,...,"pattern":1,"redlight":1}
-            "수치_기반_결과": list(dict.fromkeys(cv_texts)),
-            "예측_기반_결과": list(dict.fromkeys(pred_texts)),
-        })
-
-    # JSON 저장 (legend 포함)
-    json_path = video_dir / "frame_labels.json"
-    json_obj = {
-        "legend": {
-            "cv": CV_TEXT_MAP,
-            "pred": PRED_TEXT_MAP
-        },
-        "records": out_records
-    }
-    json_path.write_text(json.dumps(json_obj, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    # PDF 저장(옵션)
+# frame_labels.json, pdf 요약 생성 
+def save_local_frame_labels(video_dir, graph_points, cv_label_order, make_pdf):
+    json_path, out_records = export_frame_labels_json(video_dir, graph_points, cv_label_order)
     pdf_path = None
+
     if make_pdf:
         pdf_path = video_dir / "frame_labels.pdf"
         try:
@@ -493,5 +428,4 @@ def save_local_frame_labels(
         except Exception:
             # reportlab 미설치/오류 시 PDF는 생략
             pdf_path = None
-
     return json_path, pdf_path
