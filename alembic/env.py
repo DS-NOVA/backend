@@ -27,6 +27,7 @@ from app.models.user import User
 from app.models.video import Video
 from app.models.history import History 
 from app.models.refresh_token import RefreshToken #새 모델을 추가하는 경우에만 사용
+from app.models.predicted_result import PredictedResult
 target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:

@@ -33,3 +33,11 @@ uploads/
 
 #profiles
 static/
+
+#lightgbm
+data/
+models/
+
+#models 파일은 추적 허용
+!app/models/
+!app/models/**

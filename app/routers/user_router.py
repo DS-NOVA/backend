@@ -145,4 +145,3 @@ def me(user = Depends(get_current_user)):
             "user_email": user.user_email,
         }
     }
-
