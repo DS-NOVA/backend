@@ -9,9 +9,6 @@ import timm
 import joblib
 
 
-router = APIRouter(prefix="/nova/dashboard/video/upload")
-
-
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 RAW_DIR      = PROJECT_ROOT / "data" / "raw"
 MODEL_PATH   = PROJECT_ROOT / "models" / "saved_models" / "model_lightgbm.pkl"
@@ -110,7 +107,6 @@ def _predict_flags_and_probs(model_clf, X_df_or_np, label_names, multilabel=Fals
 class PredictRequest(BaseModel):
     filename: str
 
-@router.post("/")
 def predict(req: PredictRequest):
     """
     파이프라인 스크립트에서 하던 것:

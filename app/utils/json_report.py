@@ -5,7 +5,7 @@ from app.utils.frame_labels import CV_TEXT_MAP, PRED_TEXT_MAP
 def export_frame_labels_json(video_dir: Path, graph_points: list[dict], cv_label_order: list[str]) -> Path:
 
     out_records = build_label_records(graph_points, cv_label_order)
-    
+
     # JSON 저장 (legend 포함)
     json_path = video_dir / "frame_labels.json"
     json_obj = {
@@ -17,7 +17,7 @@ def export_frame_labels_json(video_dir: Path, graph_points: list[dict], cv_label
     }
     json_path.write_text(json.dumps(json_obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    return json_path
+    return json_path, out_records
 
 def build_label_records(graph_points: list[dict], cv_label_order: list[str]) -> list[dict]:
     names = list(cv_label_order) + ["flash", "pattern", "redlight"]

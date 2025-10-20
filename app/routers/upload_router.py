@@ -17,6 +17,7 @@ from app.cruds.metrics_crud import run_cv_metrics, dump_json
 from app.utils.pdf_report import export_frame_labels_pdf
 from app.utils.frame_labels import CV_TEXT_MAP, PRED_TEXT_MAP
 from app.utils.json_report import export_frame_labels_json
+from app.utils.frame_format import extract_frames, get_interpolation_ranges, format_detection_result, _make_graph_points_per_frame, _active_labels_in_span, cv_union_vector_by_label
 
 router = APIRouter(prefix="/nova/dashboard/video/upload")
 
@@ -31,121 +32,6 @@ RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 FRAME_EXT = ".png"
 BASE_URL  = "http://127.0.0.1:8000"  # 정적파일 마운트: /static
-
-
-# 유틸 함수 
-# 비디오 파일에서 프레임을 추출해 frame_dir에 저장
-# 총 프레임 수, fps 반환 
-def extract_frames(video_path: Path, frames_dir: Path, frame_ext: str = FRAME_EXT) -> tuple[int, float]:
-    frames_dir.mkdir(parents=True, exist_ok=True)
-    for p in frames_dir.glob(f"frame_*{frame_ext}"):
-        p.unlink(missing_ok=True)
-    cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise HTTPException(status_code=400, detail=f"영상을 열 수 없습니다: {video_path}")
-    fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-    idx = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        out_path = frames_dir / f"frame_{idx:04d}{frame_ext}"
-        cv2.imwrite(str(out_path), frame)
-        idx += 1
-    cap.release()
-    if total_frames == 0:
-        total_frames = idx
-    return total_frames, float(fps)
-
-# 연속된 프레임 (flash/pattern/redlight) 중 하나라도 1이 있다면,
-# [시작, 끝] 구간으로 묶어 리스트로 반환 
-def get_interpolation_ranges(frames_data: List[dict]) -> List[Tuple[int, int]]:
-    risky = [f["frame"] for f in frames_data if f["flash"] or f["pattern"] or f["redlight"]]
-    if not risky:
-        return []
-    ranges = []
-    start = prev = risky[0]
-    for fr in risky[1:]:
-        if fr == prev + 1:
-            prev = fr
-        else:
-            ranges.append((start, prev))
-            start = fr
-            prev = fr
-    ranges.append((start, prev))
-    return ranges
-
-# 프레임 인덱스, 각 라벨의 결과 (0/1), 결과 확률을 정규화하여 반환 
-def format_detection_result(
-    result_obj: dict,
-    prepend_flags: Dict[str, List[int]] | None = None,
-    prepend: bool = True
-) -> List[dict]:
-    flags = result_obj["flags"]
-    probs = result_obj.get("probs", {})
-    num_frames = result_obj["num_frames"]
-    base_names = ["flash", "pattern", "redlight"]
-    extra_names = list(prepend_flags.keys()) if prepend_flags else []
-    def _at(arr, i, default=0):
-        return int(arr[i]) if (arr and i < len(arr)) else default
-    def _atf(arr, i, default=0.0): return float(arr[i]) if (arr and i < len(arr)) else default
-    frames_data = []
-    for i in range(num_frames):
-        row = {"frame": i}
-        for name in extra_names:
-            row[name] = _at(prepend_flags[name], i, 0)
-        for name in base_names:
-            row[name] = _at(flags[name], i, 0)
-        # 확률
-        row["flash_prob"]    = _atf(probs.get("flash"), i, 0.0)
-        row["pattern_prob"]  = _atf(probs.get("pattern"), i, 0.0)
-        row["redlight_prob"] = _atf(probs.get("redlight"), i, 0.0)
-        frames_data.append(row)
-    return frames_data
-
-# 프레임별 시작/끝, 모든 라벨의 0/1, 확률을 묶어
-# 그래프 시각화용 배열 생성 
-def _make_graph_points_per_frame(frames_data: list[dict], fps: float, cv_label_order: list[str]) -> list[dict]:
-    names = list(cv_label_order) + ["flash", "pattern", "redlight"]
-    n = len(frames_data)
-    if n == 0 or fps <= 0:
-        return []
-    out = []
-    for i in range(n):
-        vec = [int(frames_data[i].get(nm, 0)) for nm in names]
-        start_sec = round(i / fps, 3)
-        end_sec   = round((i + 1) / fps, 3)
-        out.append({"frame" : i, 
-                    "start": start_sec, 
-                    "end": end_sec, 
-                    "labels": vec, 
-                    "probs": {
-                        "flash":   float(frames_data[i].get("flash_prob", 0.0)),
-                        "pattern": float(frames_data[i].get("pattern_prob", 0.0)),
-                        "redlight":float(frames_data[i].get("redlight_prob", 0.0)),
-                    }
-        })
-    return out
-
-# [시작, 끝] 구간에서 한 번이라도 1이 나온 라벨을 정렬하여 반환  (예: php, psp 등)
-def _active_labels_in_span(
-    frames_data: List[dict],
-    label_names: List[str],   # 보낼 라벨들 (예: cv_label_order)
-    s: int,
-    e: int
-) -> List[str]:
-    if not frames_data or not label_names:
-        return []
-    s = max(0, s)
-    e = min(e, len(frames_data) - 1)
-    on = set()
-    for i in range(s, e + 1):
-        row = frames_data[i]
-        for nm in label_names:
-            if int(row.get(nm, 0)) != 0:
-                on.add(nm)
-    return sorted(on)
 
 # 1. upload router
 @router.post("/")
@@ -241,7 +127,7 @@ async def upload_video(
             "redlight":{"violated": sum(predict_result["result"]["flags"]["redlight"])> 0}
         }
 
-        frame_labels_pdf_path = save_local_frame_labels(
+        frame_labels_json_path, frame_labels_pdf_path = save_local_frame_labels(
             video_dir, graph_points, cv_label_order, make_pdf=True
         )
 
@@ -255,26 +141,25 @@ async def upload_video(
 
         #위험이 전혀 없으면(모두 0) 보간, 밝기, 채도 변화 없이 반환하기 
         if sum(risky_mask) == 0:  
-            result_json = {
-                "video_id": file_key,
-                "fps": fps,
-                "graphData": graph_points, # 프레임 단위 시각화 데이터
-                "cvLabelOrder": cv_label_order, # cv 라벨 이름 순서
-                "cvUnionByLabel": cv_union_by_label, # cv OR 연산 (가이드라인 6가지가 한 번이라도 1이 나온 적이 있는지)
-                "requestedParams": requested_params, # 사용자가 선택한 밝기, 채도
-                "appliedParams": applied_params, # 실제 파라미터 
-                "cvMetricsJson": f"{BASE_URL}/static/uploads/{file_key}/cv_metrics.json", #openCV 결과 요약
-                "interpolatedSpans": [], # 보간이 삽입된 구간
-                "riskyRanges": [], # 위험 구간
-                "inputSrc": f"{BASE_URL}/static/uploads/{file_key}/{file_key}.mp4", # 원본 영상
-                "outputSrc": f"{BASE_URL}/static/uploads/{file_key}/{file_key}.mp4", # 변환된 영상 
-                "outputSrcInterpolated": None, # 보간 결과가 없으므로 None
-                "guidelineSummary": guideline_summary, # 검출 모델 결과 
-                "frameLabelsJson": f"{BASE_URL}/static/uploads/{file_key}/frame_labels.json", # 프레임 별 라벨 요약
-                "frameLabelsPdf":  (f"{BASE_URL}/static/uploads/{file_key}/frame_labels.pdf" # 프레임 별 라벨 요약 pdf
-                                    if frame_labels_pdf_path else None)
-            }
+            result_json = build_result_payload(
+                file_key=file_key,
+                video_id=video_id,
+                fps=fps,
+                graph_points=graph_points,
+                cv_label_order=cv_label_order,
+                cv_union_by_label=cv_union_by_label,
+                requested_params=requested_params,
+                applied_params=applied_params,
+                cv_json_path=cv_json_path,
+                guideline_summary=guideline_summary,
+                frame_labels_pdf_path=frame_labels_pdf_path,
+                risky_mask=risky_mask,
+                bridged_ranges=bridged_ranges,
+                frames_data=frames_data,
+                base_url=BASE_URL
+            )
             (video_dir / "result.json").write_text(json.dumps(result_json, ensure_ascii=False), encoding="utf-8")
+
             print(f"위험구간 없는 경우: {time.time() - start_time:.2f}초")
             
             return {
@@ -353,27 +238,25 @@ async def upload_video(
                 "labels": labels_in_span            # 텍스트 대신 라벨 코드만
             })
 
-        result_json = {
-            "video_id": file_key,
-            "fps": fps,
-            "graphData": graph_points,
-            "cvLabelOrder": cv_label_order,
-            "cvUnionByLabel": cv_union_by_label,
-            "requestedParams": requested_params,
-            "appliedParams": applied_params,
-            "cvMetricsJson": f"{BASE_URL}/static/uploads/{file_key}/cv_metrics.json",
-            "interpolatedSpans": interpolated_spans,
-            "riskyRanges": risky_ranges_sec,
-            "riskyRangesIdx": bridged_ranges,
-            "inputSrc": f"{BASE_URL}/static/uploads/{file_key}/{file_key}.mp4",
-            "outputSrc": f"{BASE_URL}/static/uploads/{file_key}/{file_key}.mp4",
-            "outputSrcInterpolated": full_url,
-            "guidelineSummary": guideline_summary,
-            "frameLabelsJson": f"{BASE_URL}/static/uploads/{file_key}/frame_labels.json",
-            "frameLabelsPdf":  (f"{BASE_URL}/static/uploads/{file_key}/frame_labels.pdf"  
-                                    if frame_labels_pdf_path else None)
-        }
+        result_json = build_result_payload(
+            file_key=file_key,
+            video_id=video_id,
+            fps=fps,
+            graph_points=graph_points,
+            cv_label_order=cv_label_order,
+            cv_union_by_label=cv_union_by_label,
+            requested_params=requested_params,
+            applied_params=applied_params,
+            cv_json_path=cv_json_path,
+            guideline_summary=guideline_summary,
+            frame_labels_pdf_path=frame_labels_pdf_path,
+            risky_mask=risky_mask,
+            bridged_ranges=bridged_ranges,
+            frames_data=frames_data,
+            base_url=BASE_URL
+            )
         (video_dir / "result.json").write_text(json.dumps(result_json, ensure_ascii=False), encoding="utf-8")
+
         print(f"전체 걸리는 시간: {time.time() - start_time:.2f}초")
 
         return {
@@ -405,17 +288,6 @@ async def upload_video(
         raise HTTPException(status_code=500, detail=f"[업로드 및 보간 실패] {str(e)}")
 
 
-# === helpers: CV metrics 합치기 ===
-# 라벨중 하나라도 1이 있으면 1 -> 그래프 가이드라인에 활용
-def cv_union_vector_by_label(cv_flags: dict[str, list[int]], label_order: list[str]) -> list[int]:
-    if not cv_flags or not label_order:
-        return []
-    out = []
-    for name in label_order:
-        arr = cv_flags.get(name) or []
-        out.append(1 if any(int(x) != 0 for x in arr) else 0)
-    return out
-
 # frame_labels.json, pdf 요약 생성 
 def save_local_frame_labels(video_dir, graph_points, cv_label_order, make_pdf):
     json_path, out_records = export_frame_labels_json(video_dir, graph_points, cv_label_order)
@@ -429,3 +301,104 @@ def save_local_frame_labels(video_dir, graph_points, cv_label_order, make_pdf):
             # reportlab 미설치/오류 시 PDF는 생략
             pdf_path = None
     return json_path, pdf_path
+
+
+
+def build_result_payload(
+    file_key: str,
+    video_id: str,
+    fps: float,
+    graph_points: list[dict],
+    cv_label_order: list[str],
+    cv_union_by_label: list[int],
+    requested_params: dict,
+    applied_params: dict,
+    cv_json_path: Path,
+    guideline_summary: dict,
+    frame_labels_pdf_path: Path | None,
+    risky_mask: list[int],
+    bridged_ranges: list[tuple[int, int]],
+    frames_data: list[dict],
+    base_url: str = BASE_URL
+) -> dict:
+    """
+    업로드 및 분석 결과를 정리해 프론트로 보낼 JSON payload 생성.
+    위험 프레임 여부에 따라 분기 처리.
+    """
+
+    # 위험 구간이 전혀 없는 경우
+    if sum(risky_mask) == 0:
+        return {
+            "video_id": file_key,
+            "fps": fps,
+            "graphData": graph_points,
+            "cvLabelOrder": cv_label_order,
+            "cvUnionByLabel": cv_union_by_label,
+            "requestedParams": requested_params,
+            "appliedParams": applied_params,
+            "cvMetricsJson": f"{base_url}/static/uploads/{file_key}/cv_metrics.json",
+            "interpolatedSpans": [],
+            "riskyRanges": [],
+            "inputSrc": f"{base_url}/static/uploads/{file_key}/{file_key}.mp4",
+            "outputSrc": f"{base_url}/static/uploads/{file_key}/{file_key}.mp4",
+            "outputSrcInterpolated": None,
+            "guidelineSummary": guideline_summary,
+            "frameLabelsJson": f"{base_url}/static/uploads/{file_key}/frame_labels.json",
+            "frameLabelsPdf": (
+                f"{base_url}/static/uploads/{file_key}/frame_labels.pdf"
+                if frame_labels_pdf_path else None
+            )
+        }
+
+    # 위험 구간이 존재하는 경우
+    # 보간 위치와 위험 라벨 구간 구성
+    n_frames = len(frames_data)
+    insert_mask = [0] * max(0, n_frames - 1)
+    insert_pairs_idx = []
+
+    def _in_any_range(i: int) -> bool:
+        for s, e in bridged_ranges:
+            if s <= i and (i + 1) <= e:
+                return True
+        return False
+
+    for i in range(n_frames - 1):
+        if risky_mask[i] == 1 and risky_mask[i + 1] == 1 and _in_any_range(i):
+            insert_mask[i] = 1
+            insert_pairs_idx.append((i, i + 1))
+
+    interpolated_spans = [{"start": round(s / fps, 3), "end": round(e / fps, 3)} for (s, e) in insert_pairs_idx]
+
+    risky_ranges_sec = []
+    label_names = list(cv_label_order) + ["flash", "pattern", "redlight"]
+    for (s, e) in bridged_ranges:
+        labels_in_span = _active_labels_in_span(frames_data, label_names, s, e)
+        risky_ranges_sec.append({
+            "start": round(s / fps, 3),
+            "end": round((e + 1) / fps, 3),
+            "labels": labels_in_span
+        })
+
+    # 결과 JSON 생성
+    return {
+        "video_id": file_key,
+        "fps": fps,
+        "graphData": graph_points,
+        "cvLabelOrder": cv_label_order,
+        "cvUnionByLabel": cv_union_by_label,
+        "requestedParams": requested_params,
+        "appliedParams": applied_params,
+        "cvMetricsJson": f"{base_url}/static/uploads/{file_key}/cv_metrics.json",
+        "interpolatedSpans": interpolated_spans,
+        "riskyRanges": risky_ranges_sec,
+        "riskyRangesIdx": bridged_ranges,
+        "inputSrc": f"{base_url}/static/uploads/{file_key}/{file_key}.mp4",
+        "outputSrc": f"{base_url}/static/uploads/{file_key}/{file_key}.mp4",
+        "outputSrcInterpolated": None,  # 보간된 영상 URL은 나중에 채움
+        "guidelineSummary": guideline_summary,
+        "frameLabelsJson": f"{base_url}/static/uploads/{file_key}/frame_labels.json",
+        "frameLabelsPdf": (
+            f"{base_url}/static/uploads/{file_key}/frame_labels.pdf"
+            if frame_labels_pdf_path else None
+        )
+    }
