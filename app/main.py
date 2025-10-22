@@ -11,8 +11,16 @@ from app.routers import feedback_router
 
 from app.routers import pipeline_predict
 from app.db.mongo import init_mongo
+from app.cruds.interp_client import InterpClient
+from dotenv import load_dotenv
+import os
+
 
 app = FastAPI()
+
+load_dotenv()
+model_server_url = os.getenv("INTERP_MODEL_SERVER_URL")
+interp_client = InterpClient(model_server_url)
 
 origins = [
     "http://127.0.0.1:5501",
@@ -28,7 +36,6 @@ app.include_router(upload_router.router)
 app.include_router(history_router.router)
 app.include_router(feedback_router.router)
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
 app.include_router(pipeline_predict.router)
 
 
@@ -60,9 +67,13 @@ def db():
         db.close()
 
 
-#MongoDB 연결 준비
+#MongoDB 및 모델 서버 준비
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     init_mongo()
+    await interp_client.start()
 
-#추후 shutdown 추가
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await interp_client.close()
