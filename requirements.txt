@@ -79,3 +79,5 @@ imageio[ffmpeg]
 natsort
 motor
 reportlab
+httpx
+aiohttp

@@ -199,12 +199,11 @@ async def upload_video(
                 insert_pairs_idx.append((i, i + 1))
 
         #보간 실행: 위험구간 내 (i,i+1)에만 0.5 프레임 삽입, bridged_ranges에 밝기, 채도 조절 
-        full = assemble_interpolated_video(
+        full = await assemble_interpolated_video(
             video_id=video_id,
             fps=fps,
             base_dir=str(PROJECT_ROOT),
             frame_ext=FRAME_EXT,
-            checkpoint_abs_path="C:/nova/IFRNet-main/IFRNet_Vimeo90K.pth",
             insert_mode="mask",
             risky_ranges=bridged_ranges,    # 밝기/채도 램프 적용 범위(0 포함, 위험구간 내부만)
             risky_mask=insert_mask,         # 보간 삽입 위치(위험구간 내부 쌍만)
