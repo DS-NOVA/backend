@@ -58,11 +58,7 @@
 - 사용자 피드백: 사용자는 결과에 만족도 평가 및 개선 의견을 제출 가능
 
 ## Preview
-<img width="1041" height="1050" alt="1" src="https://github.com/user-attachments/assets/b4552b4a-f6db-4e00-9a13-84d4d6864d9e" /><br>
-<img width="1862" height="1044" alt="2" src="https://github.com/user-attachments/assets/9c6a2faa-dea5-4d52-ae4a-6c93a0f94dba" /><br>
-<img width="1862" height="1048" alt="3" src="https://github.com/user-attachments/assets/14c8a730-5106-4490-a59f-4e9015f721b0" /><br>
-<img width="1868" height="1054" alt="4" src="https://github.com/user-attachments/assets/dba3314c-2c2a-4bd3-9392-ebbdc656411a" /><br>
-<img width="1861" height="1048" alt="5" src="https://github.com/user-attachments/assets/25703ce5-b5b5-4e95-81fc-f489bb11e2ac" /><br>
-<img width="1863" height="1045" alt="6" src="https://github.com/user-attachments/assets/0936b8d1-b40c-41f1-b121-9e15862584c3" /><br>
-<img width="1856" height="1044" alt="7" src="https://github.com/user-attachments/assets/b36beec0-840c-4903-8714-506d0e5e505f" /><br>
-<img width="1862" height="1043" alt="8" src="https://github.com/user-attachments/assets/08a6cf7f-be3e-43f9-a5f0-20dc3ac7bb23" /><br>
+ <img src="https://github.com/user-attachments/assets/f95c11c2-4daa-4d10-8afe-e0eea4fc8ba9" alt="1" width="1864" height="1050" />
+ <img src="https://github.com/user-attachments/assets/8d747a2f-3625-43db-bc27-f1ea7c1647c1" alt="2" width="1862" height="1044" />
+
+
